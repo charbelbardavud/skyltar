@@ -1,0 +1,29 @@
+{
+  "name": "24SJU Kampanjskyltar",
+  "short_name": "Skyltar",
+  "lang": "sv",
+  "description": "Välj skylt, fyll i varan och priset och ladda ner en utskriftsklar PDF.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#F8F2DC",
+  "theme_color": "#F8F2DC",
+  "icons": [
+    {
+      "src": "ikon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "ikon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "ikon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -146,6 +146,21 @@ input[type=text]:focus, input:not([type]):focus { border-color: var(--accent); o
 .filebtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; border: 1.5px solid var(--ink); font-weight: 600; font-size: .88rem; cursor: pointer; background: var(--surface); }
 .filebtn input { display: none; }
 .linkbtn { background: none; border: 0; padding: 4px 2px; color: var(--err-ink); font-weight: 600; font-size: .85rem; cursor: pointer; text-decoration: underline; }
+button.filebtn { font: inherit; font-weight: 600; font-size: .88rem; color: var(--ink); }
+.bilder { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
+.bilder:empty { display: none; }
+.btile { position: relative; display: grid; gap: 4px; justify-items: center; width: 78px; }
+.btile .thumb { width: 74px; height: 74px; display: block; }
+.btile.huvud .thumb { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.bfram { all: unset; cursor: pointer; border-radius: 10px; display: block; }
+.bfram:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btile.huvud .bfram { cursor: default; }
+.btag { font-size: .7rem; line-height: 1.25; color: var(--muted); text-align: center; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btile.huvud .btag { color: var(--accent); font-weight: 700; }
+.bbort { position: absolute; top: -8px; right: -6px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  font: inherit; font-weight: 700; font-size: .95rem; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.bbort:hover { border-color: var(--err-ink); color: var(--err-ink); }
+.btile.laddar .thumb { display: grid; place-items: center; font-size: .7rem; color: var(--muted); text-align: center; }
 
 /* produktsök */
 .psok { position: relative; }
@@ -296,13 +311,24 @@ input[type=text]:focus, input:not([type]):focus { border-color: var(--accent); o
               <label class="check"><input type="checkbox" id="flerStorlekar"><span>Erbjudandet gäller sorter i olika storlekar<small>Jämförpriset visas då som ett spann, t.ex. 125,45–153,33 kr/kg.</small></span></label>
             </div>
             <label class="check"><input type="checkbox" id="pant"><span>+ pant<small>Visas under priset. Pant ingår inte i priset.</small></span></label>
-            <div class="field">
+            <div class="field" id="bildField">
               <span class="lbl">Produktbild <span class="hint">(valfritt – helst en bild utan bakgrund)</span></span>
+              <div class="bilder" id="bilder" role="list" aria-label="Bilder på skylten"></div>
               <div class="img-row">
-                <img class="thumb" id="bildThumb" alt="" hidden>
-                <label class="filebtn">Välj bild<input type="file" id="bildFil" accept="image/*"></label>
-                <button type="button" class="linkbtn" id="bildBort" hidden>Ta bort bilden</button>
+                <label class="filebtn" id="bildFilBtn"><span id="bildFilTxt">Välj bild</span><input type="file" id="bildFil" accept="image/*"></label>
+                <button type="button" class="filebtn" id="sortBtn" aria-expanded="false" aria-controls="sortBox" hidden>+ Lägg till sort</button>
               </div>
+              <div class="field psok" id="sortBox" hidden>
+                <label for="bsok">Sök sorten du vill visa på skylten</label>
+                <div class="psok-wrap">
+                  <svg class="lupp" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  <input id="bsok" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false"
+                    placeholder="t.ex. nocco mango" role="combobox" aria-expanded="false" aria-controls="bsokLista" aria-autocomplete="list" aria-describedby="bsokHint">
+                  <ul class="psok-lista" id="bsokLista" role="listbox" aria-label="Sorter" hidden></ul>
+                </div>
+                <p class="hint" id="bsokHint">Bara bilden läggs till – namn och pris på skylten ändras inte.</p>
+              </div>
+              <p class="hint" id="bildHint">Flerköp eller flera smaker? Lägg till upp till tre sorter, så visas de tillsammans på skylten.</p>
               <label class="check"><input type="checkbox" id="bildVit" checked><span>Ta bort vit bakgrund automatiskt</span></label>
               <p class="field-msg" data-for="bild"></p>
             </div>
@@ -569,7 +595,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       mangd: '', mangdMax: '', enhet: 'g', flerStorlekar: false, pant: false,
       ordPris: '', ordFran: false, lagsta30: '', lagstaSammaSomOrd: false, farskvara: false,
       bubbla: 'auto', bubbelText: '', galler: '', maxPerKund: '',
-      bild: null, format: ['A4']
+      bild: null, bilder: [], format: ['A4']
     };
   }
 
@@ -989,6 +1015,105 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   }
 
   /* ------------------------------------------------------------------
+   * Produktbilder: en bild eller en grupp med upp till tre sorter
+   * ------------------------------------------------------------------ */
+  const MAX_BILDER = 3;
+  function bildLista(o) {
+    const l = Array.isArray(o.bilder) && o.bilder.length ? o.bilder : (o.bild ? [o.bild] : []);
+    return l.filter(b => b && b.iw > 0 && b.ih > 0).slice(0, MAX_BILDER);
+  }
+  const ytaSnitt = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+  // Mallar i enhetsmått (huvudbildens höjd = 1). Varje mall ger rektanglar i ritordning: bakre bilder först,
+  // huvudbilden (index 0, den butiken valde först) sist så att den ligger längst fram.
+  function mallRad(ar, o) {
+    // bredvid varandra med nederkanten i linje – som varor på en hylla
+    const n = ar.length;
+    const ordning = n === 2 ? [0, 1] : [1, 0, 2];
+    const skala = n === 2 ? [1, 0.94] : [0.86, 1, 0.86];
+    let x = 0;
+    const r = ordning.map((i, k) => {
+      const h = skala[k], w = h * ar[i];
+      const rect = { i, x, y: 1 - h, w, h };
+      const nasta = ordning[k + 1];
+      if (nasta !== undefined) x += w - o * Math.min(w, skala[k + 1] * ar[nasta]);
+      return rect;
+    });
+    return r.filter(q => q.i !== 0).concat(r.filter(q => q.i === 0));
+  }
+  function mallStapel(ar, o) {
+    // ovanför varandra, lite förskjutna i sidled – för breda förpackningar (kakor, chokladkakor)
+    const n = ar.length;
+    const ordning = n === 2 ? [1, 0] : [1, 2, 0];
+    const skala = n === 2 ? [0.92, 1] : [0.84, 0.92, 1];
+    const sida = n === 2 ? [-0.07, 0.07] : [-0.08, 0.08, 0];
+    const W0 = ar[0];
+    let y = 0;
+    return ordning.map((i, k) => {
+      const w = skala[k] * W0, h = w / ar[i];
+      const rect = { i, x: -w / 2 + sida[k] * W0, y, w, h };
+      const nasta = ordning[k + 1];
+      if (nasta !== undefined) y += h - o * Math.min(h, skala[k + 1] * W0 / ar[nasta]);
+      return rect;
+    });
+  }
+  function mallPyramid(ar, v) {
+    // tre sorter: två bakom (bredvid varandra), huvudbilden framför och lite lägre
+    if (ar.length !== 3) return null;
+    const hb = 0.8, w1 = hb * ar[1], w2 = hb * ar[2], ob = 0.06 * Math.min(w1, w2);
+    const bredd = w1 + w2 - ob;
+    return [
+      { i: 1, x: -bredd / 2, y: 0, w: w1, h: hb },
+      { i: 2, x: -bredd / 2 + w1 - ob, y: 0, w: w2, h: hb },
+      { i: 0, x: -ar[0] / 2, y: hb * (1 - v), w: ar[0], h: 1 }
+    ];
+  }
+  function mallKaskad(ar, u, v) {
+    // två sorter: den bakre snett ovanför, huvudbilden framför och nedanför
+    if (ar.length !== 2) return null;
+    const h1 = 0.88, w1 = h1 * ar[1];
+    return [{ i: 1, x: 0, y: 0, w: w1, h: h1 }, { i: 0, x: w1 * (1 - u), y: h1 * (1 - v), w: ar[0], h: 1 }];
+  }
+
+  // Lägger 1–3 bilder i rutan [x, y, b, h] (mm). Med flera bilder provas mallarna och den som visar mest av varorna
+  // vinner: huvudbildens yta väger fullt, de andras synliga yta lite mindre, och ingen sort får skymmas till mer än hälften.
+  function bildGrupp(bilder, box) {
+    const [bx, by, bw, bh] = box;
+    const ar = bilder.map(b => b.iw / b.ih);
+    if (bilder.length === 1) {
+      let w = bw, h = w / ar[0];
+      if (h > bh) { h = bh; w = h * ar[0]; }
+      return [{ t: 'image', x: bx + (bw - w) / 2, y: by + (bh - h) / 2, w, h, img: bilder[0] }];
+    }
+    const mallar = [];
+    for (const o of [0.04, 0.12, 0.2, 0.28, 0.36]) mallar.push({ r: mallRad(ar, o), bonus: 1.08 });
+    for (const o of [0.1, 0.2, 0.3]) mallar.push({ r: mallStapel(ar, o), bonus: 1 });
+    for (const v of [0.3, 0.45, 0.6]) mallar.push({ r: mallPyramid(ar, v), bonus: 1 });
+    for (const u of [0.35, 0.55]) for (const v of [0.35, 0.55]) mallar.push({ r: mallKaskad(ar, u, v), bonus: 1 });
+    let bast = null;
+    for (const m of mallar) {
+      if (!m.r) continue;
+      const x0 = Math.min(...m.r.map(q => q.x)), x1 = Math.max(...m.r.map(q => q.x + q.w));
+      const y0 = Math.min(...m.r.map(q => q.y)), y1 = Math.max(...m.r.map(q => q.y + q.h));
+      const s = Math.min(bw / (x1 - x0), bh / (y1 - y0));
+      const ox = bx + (bw - (x1 - x0) * s) / 2, oy = by + (bh - (y1 - y0) * s) / 2;
+      const rects = m.r.map(q => ({ i: q.i, x: ox + (q.x - x0) * s, y: oy + (q.y - y0) * s, w: q.w * s, h: q.h * s }));
+      let poang = 0, ok = true;
+      rects.forEach((q, k) => {
+        let tackt = 0;
+        for (let j = k + 1; j < rects.length; j++) tackt += ytaSnitt(q, rects[j]);
+        const yta = q.w * q.h, synlig = Math.max(0, yta - tackt) / yta;
+        if (q.i !== 0 && synlig < 0.5) ok = false;
+        poang += (q.i === 0 ? 1 : 0.6) * yta * synlig;
+      });
+      poang *= m.bonus;
+      if (ok && (!bast || poang > bast.poang)) bast = { poang, rects };
+    }
+    if (!bast) return bildGrupp([bilder[0]], box);
+    return bast.rects.map(q => ({ t: 'image', x: q.x, y: q.y, w: q.w, h: q.h, img: bilder[q.i] }));
+  }
+
+  /* ------------------------------------------------------------------
    * Layout: en skylt i A4-mått (210 × 297 mm)
    * ------------------------------------------------------------------ */
   function layoutSign(a, o) {
@@ -1014,7 +1139,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     items.push(...logoItems(T.logo[0], T.logo[1], 40.1));
 
     // Produktnamn + undertext
-    const hasImg = !!(o.bild && o.bild.iw);
+    const bilder = bildLista(o);
+    const hasImg = bilder.length > 0;
     const nameX = 154.4;
     let ny = T.id === 'stormarknad' || T.id === 'nyhet' ? 119.5 : 101.5; // överkant för textblocket
     const maxBottom = T.id === 'stormarknad' || T.id === 'nyhet' ? 143 : 134;
@@ -1034,14 +1160,11 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       }
     }
 
-    // Produktbild
+    // Produktbild – en bild, eller en grupp med upp till tre sorter (flerköp, olika smaker)
     const top = d.bubbla !== 'ingen' && T.bubbla === 'top';
     if (hasImg) {
       const box = top ? [6, 146, 98, 94] : [6, 120, 98, 120];
-      const ar = o.bild.iw / o.bild.ih;
-      let w = box[2], h = w / ar;
-      if (h > box[3]) { h = box[3]; w = h * ar; }
-      items.push({ t: 'image', x: box[0] + (box[2] - w) / 2, y: box[1] + (box[3] - h) / 2, w, h, img: o.bild });
+      items.push(...bildGrupp(bilder, box));
     }
 
     // Stjärna + pris
@@ -1184,18 +1307,18 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     for (const f of formats) {
       if (f === 'A3') {
         // A3 har samma proportioner som A4: samma skylt, förstorad 297/210 (≈ 141 %)
-        const sc = 297 / 210, s = layoutSign(a, { bild: st.bild, boost: 1 });
+        const sc = 297 / 210, s = layoutSign(a, { bild: st.bild, bilder: st.bilder, boost: 1 });
         out.push({ w: 297, h: 420, format: 'A3', items: [{ t: 'group', tf: [sc, 0, 0, sc, 0, 0], clip: [0, 0, 210, 297], items: s.items }] });
       } else if (f === 'A4') {
-        const s = layoutSign(a, { bild: st.bild, boost: 1 });
+        const s = layoutSign(a, { bild: st.bild, bilder: st.bilder, boost: 1 });
         out.push({ w: 210, h: 297, format: 'A4', items: s.items });
       } else if (f === 'A5') {
-        const sc = 148.5 / 210, s = layoutSign(a, { bild: st.bild, boost: 1.1 });
+        const sc = 148.5 / 210, s = layoutSign(a, { bild: st.bild, bilder: st.bilder, boost: 1.1 });
         const items = [0, 1].map(i => ({ t: 'group', tf: [sc, 0, 0, sc, i * 148.5, 0], clip: [0, 0, 210, 297], items: s.items }));
         items.push(cutLine([[148.5, 0], [148.5, 210]]));
         out.push({ w: 297, h: 210, format: 'A5', items });
       } else if (f === 'A6') {
-        const sc = 0.5, s = layoutSign(a, { bild: st.bild, boost: 1.3 });
+        const sc = 0.5, s = layoutSign(a, { bild: st.bild, bilder: st.bilder, boost: 1.3 });
         const items = [];
         for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) items.push({ t: 'group', tf: [sc, 0, 0, sc, c * 105, r * 148.5], clip: [0, 0, 210, 297], items: s.items });
         items.push(cutLine([[105, 0], [105, 297]]), cutLine([[0, 148.5], [210, 148.5]]));
@@ -1394,8 +1517,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   }
 
   const api = {
-    PAL, TYPES, UNITS, FORMATS, DEFAULT_SPARR, DEFAULT_VARNING,
-    defaults, analyze, previewAnalysis, pages, svg, pdf, layoutSign,
+    PAL, TYPES, UNITS, FORMATS, DEFAULT_SPARR, DEFAULT_VARNING, MAX_BILDER,
+    defaults, analyze, previewAnalysis, pages, svg, pdf, layoutSign, bildGrupp,
     parseKr, parseNum, fmtKr, fmtBig, fmtJmf, measure, fitSize, wrapFit, textCmds, esc
   };
   root.SkyltEngine = api;
@@ -1452,8 +1575,10 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
 
   let config = { kampanjer: CFG.kampanjer || [], installningar: CFG.installningar || {} };
   let state = E.defaults();
-  let bild = null;          // { href, iw, ih, rgba }
-  let bildRaw = null;       // senaste valda bild (för att kunna slå av/på vit bakgrund)
+  // Bilderna på skylten, högst E.MAX_BILDER. Den första är huvudbilden (längst fram i gruppen).
+  // { bild: { href, iw, ih, rgba }, raw (originalet, för att kunna slå av/på vit bakgrund), namn, ean, kalla: 'register' | 'egen' | 'kampanj' }
+  let bilder = [];
+  let vantar = [];          // sorter vars bild hämtas just nu (visas som "Hämtar …")
   let activeCamp = null;
   let lastA = null;
   let busy = false;
@@ -1500,7 +1625,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     st.erbjudande = ($('input[name=erbjudande]:checked') || {}).value || 'st';
     st.bubbla = ($('input[name=bubbla]:checked') || {}).value || 'ingen';
     st.format = $$('input[name=format]:checked').map(i => i.value);
-    st.bild = bild;
+    st.bilder = bilder.map(b => b.bild);
+    st.bild = st.bilder[0] || null;
     return st;
   }
   function writeForm(st) {
@@ -1561,7 +1687,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const fm = { A3: 'A3 (1 stor skylt)', A4: 'A4 (1 skylt)', A5: '2 × A5 på A4', A6: '4 × A6 på A4' };
     $('#cap').textContent = state.format.length ? 'PDF:en innehåller: ' + state.format.map(f => fm[f]).join(' + ') : '';
     renderChecks(a);
-    ls.set('utkast', Object.assign({}, state, { bild: null }));
+    ls.set('utkast', Object.assign({}, state, { bild: null, bilder: [] }));
     ls.set('format', state.format);
   }
   function schedule() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 110); }
@@ -1614,10 +1740,22 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       const c2 = document.createElement('canvas'); c2.width = box.w; c2.height = box.h;
       const x2 = c2.getContext('2d'); x2.putImageData(id, -box.x, -box.y);
       id = x2.getImageData(0, 0, box.w, box.h);
-      return { href: c2.toDataURL('image/png'), iw: box.w, ih: box.h, rgba: id.data };
+      return { href: forhandsHref(c2), iw: box.w, ih: box.h, rgba: id.data };
     }
     cx.putImageData(id, 0, 0);
-    return { href: cv.toDataURL('image/png'), iw: w, ih: h, rgba: id.data };
+    return { href: forhandsHref(cv), iw: w, ih: h, rgba: id.data };
+  }
+  // Förhandsvisningen och miniatyrerna behöver inte full upplösning: högst 720 px (WebP där webbläsaren klarar det,
+  // annars PNG) håller skylten snabb även med tre bilder. PDF:en använder alltid rgba i full upplösning.
+  function forhandsHref(canvas) {
+    const s = Math.min(1, 720 / Math.max(canvas.width, canvas.height));
+    let c = canvas;
+    if (s < 1) {
+      c = document.createElement('canvas'); c.width = Math.max(1, Math.round(canvas.width * s)); c.height = Math.max(1, Math.round(canvas.height * s));
+      c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+    }
+    const webp = c.toDataURL('image/webp', 0.9);
+    return /^data:image\/webp/.test(webp) ? webp : c.toDataURL('image/png');
   }
   function removeWhiteBg(id) {
     // fyll från kanterna: ljusa, nästan grå pixlar blir genomskinliga
@@ -1649,28 +1787,80 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     if (x1 < 0) return null;
     return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
   }
-  async function setImageFromSrc(src) {
-    bildRaw = src;
+  const BILDFEL = 'Bilden gick inte att läsa. Prova en JPG- eller PNG-bild.';
+  let bildVersion = 0;
+  // Ersätter skyltens bilder med en bild (vald vara eller kampanj).
+  async function satBild(src, meta) {
+    const nr = ++bildVersion;
     try {
-      bild = await processImage(src, $('#bildVit').checked);
-      $('#bildThumb').src = bild.href; $('#bildThumb').hidden = false; $('#bildBort').hidden = false;
+      const b = await processImage(src, $('#bildVit').checked);
+      if (nr !== bildVersion) return;              // en annan vara hann väljas under tiden
+      bilder = [Object.assign({ bild: b, raw: src }, meta || {})];
       $('.field-msg[data-for="bild"]').textContent = '';
     } catch (e) {
-      bild = null;
-      $('.field-msg[data-for="bild"]').textContent = 'Bilden gick inte att läsa. Prova en JPG- eller PNG-bild.';
+      if (nr !== bildVersion) return;
+      bilder = [];
+      $('.field-msg[data-for="bild"]').textContent = BILDFEL;
     }
-    render();
+    ritaBilder(); render();
+  }
+  // Lägger till en bild sist i gruppen (egen bild eller en sort ur registret).
+  async function laggTillBild(src, meta) {
+    if (bilder.length >= E.MAX_BILDER) { toast(`Högst ${E.MAX_BILDER} bilder på en skylt – ta bort en först.`); return false; }
+    const nr = bildVersion;
+    try {
+      const b = await processImage(src, $('#bildVit').checked);
+      if (nr !== bildVersion || bilder.length >= E.MAX_BILDER) return false;
+      bilder.push(Object.assign({ bild: b, raw: src }, meta || {}));
+      $('.field-msg[data-for="bild"]').textContent = '';
+    } catch (e) {
+      $('.field-msg[data-for="bild"]').textContent = BILDFEL;
+      return false;
+    }
+    ritaBilder(); render();
+    return true;
+  }
+  function tomBilder() { bilder = []; vantar = []; bildVersion++; ritaBilder(); }
+  function ritaBilder() {
+    const tiles = bilder.map((b, i) => {
+      const namn = b.namn || (b.kalla === 'kampanj' ? 'Kampanjbild' : 'Egen bild');
+      const forst = i === 0;
+      return `<div class="btile${forst ? ' huvud' : ''}" role="listitem">` +
+        `<button type="button" class="bfram" data-i="${i}"${forst ? ' aria-disabled="true"' : ''} aria-label="${forst ? E.esc(namn) + ' ligger längst fram' : 'Lägg ' + E.esc(namn) + ' längst fram'}" title="${forst ? 'Ligger längst fram' : 'Lägg längst fram'}">` +
+        `<img class="thumb"${forst ? ' id="bildThumb"' : ''} src="${b.bild.href}" alt=""></button>` +
+        `<span class="btag">${forst && bilder.length > 1 ? 'Längst fram' : E.esc(namn)}</span>` +
+        `<button type="button" class="bbort" data-i="${i}" aria-label="Ta bort ${E.esc(namn)}" title="Ta bort">×</button></div>`;
+    }).concat(vantar.map(v => `<div class="btile laddar" role="listitem"><span class="thumb">Hämtar …</span><span class="btag">${E.esc(v.namn)}</span></div>`));
+    $('#bilder').innerHTML = tiles.join('');
+    const fullt = bilder.length + vantar.length >= E.MAX_BILDER;
+    $('#bildFilTxt').textContent = bilder.length ? '+ Egen bild' : 'Välj bild';
+    $('#bildFilBtn').hidden = fullt;
+    $('#sortBtn').hidden = fullt || !bilder.length || !produkter.length;
+    if ($('#sortBtn').hidden) visaSortSok(false);
+    $('#bildHint').textContent = fullt ? `Högst ${E.MAX_BILDER} bilder på en skylt. Tryck på en bild för att lägga den längst fram.`
+      : bilder.length > 1 ? 'Tryck på en bild för att lägga den längst fram – den är störst på skylten.'
+      : 'Flerköp eller flera smaker? Lägg till upp till tre sorter, så visas de tillsammans på skylten.';
   }
   $('#bildFil').addEventListener('change', ev => {
     const f = ev.target.files && ev.target.files[0];
     if (!f) return;
     const r = new FileReader();
-    r.onload = () => setImageFromSrc(r.result);
+    r.onload = () => laggTillBild(r.result, { kalla: 'egen' });
     r.readAsDataURL(f);
     ev.target.value = '';
   });
-  $('#bildVit').addEventListener('change', () => { if (bildRaw) setImageFromSrc(bildRaw); });
-  $('#bildBort').addEventListener('click', () => { bild = null; bildRaw = null; $('#bildThumb').hidden = true; $('#bildBort').hidden = true; render(); });
+  $('#bilder').addEventListener('click', ev => {
+    const bort = ev.target.closest('.bbort');
+    if (bort) { bilder.splice(+bort.dataset.i, 1); ritaBilder(); render(); return; }
+    const fram = ev.target.closest('.bfram');
+    if (fram && +fram.dataset.i > 0) { bilder.unshift(bilder.splice(+fram.dataset.i, 1)[0]); ritaBilder(); render(); }
+  });
+  $('#bildVit').addEventListener('change', async () => {
+    const vit = $('#bildVit').checked, nu = bilder.slice();
+    const nya = await Promise.all(nu.map(b => processImage(b.raw, vit).catch(() => b.bild)));
+    nu.forEach((b, i) => { b.bild = nya[i]; });       // samma objekt ligger kvar i bilder om de inte tagits bort
+    ritaBilder(); render();
+  });
 
   /* ---------- produktsök ---------- */
   // rad: [ean, namn, mängd, enhet, varumärke, kassanamn, kontrollera mängd (1/0), pant (1 ja / 0 okänt / -1 nej)]
@@ -1685,6 +1875,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
         hay, kompakt: hay.replace(/ /g, ''), namnN: ' ' + norm(r[1]), g14: ('00000000000000' + String(r[0])).slice(-14) };
     });
     $('#psokBox').hidden = !produkter.length;
+    ritaBilder();
     if (CFG.mode === 'demo' && produkter.length) $('#psokHint').textContent = `Provversionen har ${produkter.length} exempelvaror – prova nocco, marabou eller snickers. I den riktiga appen söker butiken i hela produktregistret.`;
   }
   function sok(q) {
@@ -1757,7 +1948,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       $('#pant').checked = p.pant === 1;
       touchedFields.produkt = 1; touchedFields.mangd = 1;
     }
-    bild = null; bildRaw = null; $('#bildThumb').hidden = true; $('#bildBort').hidden = true;
+    tomBilder();
     bildLage = 'hamtar';
     visaVald();
     render();
@@ -1780,19 +1971,19 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     box.hidden = false;
   }
   $('#psokVald').addEventListener('click', ev => { if (ev.target.id === 'psokHelt' && valdProdukt) valjProdukt(valdProdukt, true); });
+  // Varans bild ur registret: data-URL eller null (ingen bild). Avvisas om servern inte svarar.
+  function hamtaBildSrc(p) {
+    if (SERVER) return server.produktBild(p.ean).then(r => r && (r.b64 || r.href) ? (r.href || `data:${r.mime || 'image/png'};base64,${r.b64}`) : null);
+    const href = (CFG.produktBilder || {})[p.ean];
+    return new Promise(ok => setTimeout(() => ok(href || null), 120));
+  }
   function hamtaProduktBild(p) {
-    const klar = r => {
+    hamtaBildSrc(p).then(src => {
       if (valdProdukt !== p) return;  // användaren har hunnit välja en annan vara
-      if (r && (r.b64 || r.href)) { setImageFromSrc(r.href || `data:${r.mime || 'image/png'};base64,${r.b64}`); bildLage = 'ok'; }
+      if (src) { satBild(src, { namn: p.namn, ean: p.ean, kalla: 'register' }); bildLage = 'ok'; }
       else bildLage = 'saknas';
       visaVald();
-    };
-    if (SERVER) {
-      server.produktBild(p.ean).then(klar, () => { if (valdProdukt === p) { bildLage = 'fel'; visaVald(); } });
-    } else {
-      const href = (CFG.produktBilder || {})[p.ean];
-      setTimeout(() => klar(href ? { href } : null), 120);
-    }
+    }, () => { if (valdProdukt === p) { bildLage = 'fel'; visaVald(); } });
   }
   let blurTimer = null;
   $('#psok').addEventListener('input', () => { clearTimeout(blurTimer); visaTraffar(); });
@@ -1807,6 +1998,83 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   $('#psokLista').addEventListener('mousedown', ev => ev.preventDefault()); // behåll fokus i sökrutan
   $('#psokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjProdukt(psokTraffar[+li.dataset.i]); });
   $('#psok').addEventListener('blur', () => { clearTimeout(blurTimer); blurTimer = setTimeout(stangLista, 150); });
+
+  /* ---------- fler sorter på skylten (bara bilden läggs till) ---------- */
+  let bsokTraffar = [], bsokAktiv = -1, bsokBlur = null;
+  function visaSortSok(visa) {
+    $('#sortBox').hidden = !visa;
+    $('#sortBtn').setAttribute('aria-expanded', String(!!visa));
+    if (!visa) { $('#bsok').value = ''; stangSortLista(); }
+  }
+  function stangSortLista() { $('#bsokLista').hidden = true; $('#bsok').setAttribute('aria-expanded', 'false'); $('#bsok').removeAttribute('aria-activedescendant'); }
+  function visaSortTraffar() {
+    const q = $('#bsok').value, lista = $('#bsokLista');
+    const redan = new Set(bilder.map(b => b.ean).concat(vantar.map(v => v.ean)).filter(Boolean));
+    bsokTraffar = sok(q).filter(p => !redan.has(p.ean));
+    bsokAktiv = bsokTraffar.length ? 0 : -1;
+    if (!q.trim()) { stangSortLista(); return; }
+    lista.innerHTML = bsokTraffar.length
+      ? bsokTraffar.map((p, i) => `<li role="option" id="bs-${i}" data-i="${i}" aria-selected="${i === bsokAktiv}"><b>${E.esc(p.namn)}</b><span>${E.esc([storlekText(p), p.ean].filter(Boolean).join(' · '))}</span></li>`).join('')
+      : '<li class="tom">Ingen vara hittades.</li>';
+    lista.hidden = false;
+    $('#bsok').setAttribute('aria-expanded', 'true');
+    $('#bsok').setAttribute('aria-activedescendant', bsokAktiv >= 0 ? 'bs-' + bsokAktiv : '');
+  }
+  function markeraSort(i) {
+    bsokAktiv = i;
+    $$('#bsokLista li[role=option]').forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
+    const li = $('#bs-' + i); if (li) li.scrollIntoView({ block: 'nearest' });
+    $('#bsok').setAttribute('aria-activedescendant', i >= 0 ? 'bs-' + i : '');
+  }
+  function valjSort(p) { visaSortSok(false); laggTillSort(p); }
+  async function laggTillSort(p) {
+    if (bilder.length + vantar.length >= E.MAX_BILDER) return;
+    const v = { namn: p.namn, ean: p.ean };
+    vantar.push(v); ritaBilder();
+    let src = null;
+    try { src = await hamtaBildSrc(p); } catch (e) { src = null; }
+    const kvar = vantar.includes(v);       // formuläret kan ha tömts under tiden
+    vantar = vantar.filter(x => x !== v);
+    if (!kvar) return;
+    if (!src) { ritaBilder(); toast(`${p.namn} har ingen bild i registret – lägg till en egen bild om du vill.`); return; }
+    if (await laggTillBild(src, { namn: p.namn, ean: p.ean, kalla: 'register' })) utokaSpann(p);
+  }
+  // Sorter i olika storlekar: jämförpriset ska täcka alla, så spannet utökas (t.ex. 225–275 g).
+  const talText = v => String(Math.round(v * 1000) / 1000).replace('.', ',');
+  function utokaSpann(p) {
+    const U = E.UNITS, enh = ($('input[name=enhet]:checked') || {}).value;
+    if ($('input[name=erbjudande]:checked') && $('input[name=erbjudande]:checked').value === 'kg') return;
+    if (!p.mangd || !U[p.enhet] || !U[enh]) return;
+    if (U[p.enhet].bas !== U[enh].bas) { toast(`${p.namn} säljs i ${p.enhet} – kontrollera mängden och jämförpriset.`); return; }
+    const q = E.parseNum($('#mangd').value), pq = E.parseNum(p.mangd);
+    if (!q || isNaN(q) || !pq || isNaN(pq)) return;
+    const qMax = $('#flerStorlekar').checked ? E.parseNum($('#mangdMax').value) : q;
+    const f = U[enh].f, x = pq * U[p.enhet].f / f;              // sortens mängd i formulärets enhet
+    let lo = Math.min(q, qMax && !isNaN(qMax) ? qMax : q), hi = Math.max(q, qMax && !isNaN(qMax) ? qMax : q);
+    if (x >= lo - 1e-9 && x <= hi + 1e-9) return;
+    lo = Math.min(lo, x); hi = Math.max(hi, x);
+    $('#mangd').value = talText(lo); $('#mangdMax').value = talText(hi); $('#flerStorlekar').checked = true;
+    touchedFields.mangd = 1;
+    toast(`Sorterna har olika storlek – jämförpriset visas nu som spann, ${talText(lo)}–${talText(hi)} ${enh}.`);
+    render();
+  }
+  $('#sortBtn').addEventListener('click', () => {
+    const visa = $('#sortBox').hidden;
+    visaSortSok(visa);
+    if (visa) setTimeout(() => $('#bsok').focus(), 30);
+  });
+  $('#bsok').addEventListener('input', () => { clearTimeout(bsokBlur); visaSortTraffar(); });
+  $('#bsok').addEventListener('focus', () => { clearTimeout(bsokBlur); if ($('#bsok').value.trim()) visaSortTraffar(); });
+  $('#bsok').addEventListener('keydown', ev => {
+    const n = bsokTraffar.length;
+    if (ev.key === 'ArrowDown' && n) { ev.preventDefault(); if ($('#bsokLista').hidden) visaSortTraffar(); else markeraSort((bsokAktiv + 1) % n); }
+    else if (ev.key === 'ArrowUp' && n) { ev.preventDefault(); markeraSort((bsokAktiv - 1 + n) % n); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); if (!$('#bsokLista').hidden && bsokAktiv >= 0 && bsokTraffar[bsokAktiv]) valjSort(bsokTraffar[bsokAktiv]); else { visaSortTraffar(); if (bsokTraffar.length === 1) valjSort(bsokTraffar[0]); } }
+    else if (ev.key === 'Escape') { if ($('#bsokLista').hidden) visaSortSok(false); else stangSortLista(); }
+  });
+  $('#bsokLista').addEventListener('mousedown', ev => ev.preventDefault());
+  $('#bsokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjSort(bsokTraffar[+li.dataset.i]); });
+  $('#bsok').addEventListener('blur', () => { clearTimeout(bsokBlur); bsokBlur = setTimeout(stangSortLista, 150); });
 
   /* ---------- kampanjer ---------- */
   function renderCampaigns() {
@@ -1834,10 +2102,10 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     });
     writeForm(st);
     valdProdukt = null; valdHelt = false; autoUndertext = ''; $('#psokVald').hidden = true;
-    bild = null; bildRaw = null; $('#bildThumb').hidden = true; $('#bildBort').hidden = true;
-    if (k.bildHref) setImageFromSrc(k.bildHref);
+    tomBilder();
+    if (k.bildHref) satBild(k.bildHref, { kalla: 'kampanj' });
     else if (k.bildId && SERVER) {
-      server.kampanjBild(k.id).then(r => { if (r && r.b64 && activeCamp === k) setImageFromSrc(`data:${r.mime};base64,${r.b64}`); }, () => { });
+      server.kampanjBild(k.id).then(r => { if (r && r.b64 && activeCamp === k) satBild(`data:${r.mime};base64,${r.b64}`, { kalla: 'kampanj' }); }, () => { });
     }
     showAll = false;
     if (CFG.mode !== 'demo') $('#campHint').textContent = k.info ? 'Info från kedjan: ' + k.info : 'Fyll i ditt eget pris nedan.';
@@ -1909,8 +2177,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   }
 
   /* ---------- händelser ---------- */
-  $('#f').addEventListener('input', ev => { if (ev.target.id === 'psok') return; if (ev.target.id) touchedFields[ev.target.id] = 1; if (ev.target.name) touchedFields[ev.target.name] = 1; schedule(); });
-  $('#f').addEventListener('change', ev => { if (ev.target.id === 'psok') return; if (ev.target.id) touchedFields[ev.target.id] = 1; schedule(); });
+  $('#f').addEventListener('input', ev => { if (ev.target.id === 'psok' || ev.target.id === 'bsok') return; if (ev.target.id) touchedFields[ev.target.id] = 1; if (ev.target.name) touchedFields[ev.target.name] = 1; schedule(); });
+  $('#f').addEventListener('change', ev => { if (ev.target.id === 'psok' || ev.target.id === 'bsok') return; if (ev.target.id) touchedFields[ev.target.id] = 1; schedule(); });
   $('#f').addEventListener('submit', ev => ev.preventDefault());
   $('#types').addEventListener('change', () => {
     // byte av skylttyp: bubblan följer mallen (BÄTTRE PRIS! har ”nu till bättre pris!”)
@@ -1924,7 +2192,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   $('#reset').addEventListener('click', () => {
     const fmt = readForm().format;
     writeForm(Object.assign(E.defaults(), { typ: readForm().typ, format: fmt, enhet: 'g', erbjudande: 'st' }));
-    bild = null; bildRaw = null; activeCamp = null; $('#bildThumb').hidden = true; $('#bildBort').hidden = true;
+    tomBilder(); activeCamp = null; visaSortSok(false);
     valdProdukt = null; valdHelt = false; autoUndertext = ''; $('#psok').value = ''; $('#psokVald').hidden = true; stangLista();
     $$('.camp').forEach(x => x.setAttribute('aria-pressed', 'false'));
     for (const k in touchedFields) delete touchedFields[k];
@@ -1955,6 +2223,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     }
   }
   $('#demoNotice').hidden = CFG.mode !== 'demo';
+  ritaBilder();
   if (SERVER) {
     server.config().then(
       c => { config = Object.assign(config, c || {}); start(); },

@@ -546,9 +546,10 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     stormarknad: {
       id: 'stormarknad', namn: 'STORMARKNADSPRIS NÄRA DIG!', rubrik: ['STORMARKNADSPRIS', 'NÄRA DIG!'],
       nar: 'Alltid bra pris under längre tid, t.ex. stående multipris (mjölk – alltid 10 kr).',
-      head: PAL.yellow, headDark: PAL.yellowDark, headText: PAL.priceRed, headShadow: PAL.redDark,
+      // rubriken i prisets röda med vit skugga, och fnuttarna (gnistorna) i samma röda – Charbels val 19/10
+      head: PAL.yellow, headDark: PAL.yellowDark, headText: PAL.priceRed, headShadow: PAL.white,
       bg: PAL.white, ray: PAL.ray, burst: PAL.gold, price: PAL.priceRed, multiText: PAL.black,
-      sparks: PAL.yellowDark, footer: 'one', sankning: false, bubbla: 'bottom', logo: [155.5, 94], burstC: [143, 191]
+      sparks: PAL.priceRed, footer: 'one', sankning: false, bubbla: 'bottom', logo: [155.5, 94], burstC: [143, 191]
     },
     nyhet: {
       id: 'nyhet', namn: 'NYHET!', rubrik: ['NYHET!'],

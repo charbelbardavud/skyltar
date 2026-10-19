@@ -180,14 +180,18 @@ button.filebtn { font: inherit; font-weight: 600; font-size: .88rem; color: var(
 .psok input[type=search] { width: 100%; padding: 11px 12px 11px 38px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); min-width: 0; -webkit-appearance: none; appearance: none; }
 .psok input[type=search]:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .psok .lupp { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
-.psok-lista { position: absolute; z-index: 15; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px;
-  box-shadow: 0 10px 26px var(--paper-shadow); max-height: min(360px, 55vh); overflow-y: auto; }
-.psok-lista li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.psok-lista { position: absolute; z-index: 15; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 0 4px 4px; list-style: none; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 26px var(--paper-shadow); max-height: min(360px, 55vh); overflow-y: auto; overscroll-behavior: contain; }
+.psok-lista li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; scroll-margin-top: 34px; }
 .psok-lista li b { font-size: .92rem; font-weight: 600; line-height: 1.3; }
 .psok-lista li span { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .psok-lista li[aria-selected="true"], .psok-lista li:hover { background: var(--sage); }
-.psok-lista li.tom { cursor: default; color: var(--muted); font-size: .85rem; }
+.psok-lista li.tom { cursor: default; color: var(--muted); font-size: .85rem; margin-top: 4px; }
 .psok-lista li.tom:hover { background: none; }
+/* antalet träffar överst – står kvar när man skrollar i listan */
+.psok-lista li.antal { position: sticky; top: 0; z-index: 1; display: block; margin: 0 -4px 2px; padding: 8px 14px 6px; border-radius: 0; cursor: default;
+  background: var(--surface); border-bottom: 1px solid var(--line); font-size: .76rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.psok-lista li.antal:hover { background: var(--surface); }
 .psok-vald { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: .82rem; background: var(--surface-2); border-radius: 10px; padding: 7px 10px; }
 .psok-vald b { font-weight: 700; }
 .psok-vald .warn { color: var(--warn-ink); font-weight: 600; }
@@ -2053,68 +2057,129 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   });
 
   /* ---------- produktsök ---------- */
-  // rad: [ean, namn, mängd, enhet, varumärke, kassanamn, kontrollera mängd (1/0), pant (1 ja / 0 okänt / -1 nej)]
+  // rad: [ean, namn, mängd, enhet, varumärke, kassanamn, kontrollera mängd (1/0), pant (1 ja / 0 okänt / -1 nej)],
+  // i registrets rangordning (1 = mest såld i kedjan)
   let produkter = [];
-  let psokTraffar = [], psokAktiv = -1, valdProdukt = null, valdHelt = false, autoUndertext = '', bildLage = '';
-  const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9%,.&]+/g, ' ').trim();
+  let valdProdukt = null, valdHelt = false, autoUndertext = '', bildLage = '';
+  // norm: utan accenter och utan å, ä, ö (”Mjölk” → ”mjolk”); normA: å, ä och ö kvar (æ/ø räknas som ä/ö)
+  const norm = t => String(t || '').toLowerCase().replace(/æ/g, 'a').replace(/ø/g, 'o').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9%,.&]+/g, ' ').trim();
+  const normA = t => String(t || '').toLowerCase().replace(/æ/g, 'ä').replace(/ø/g, 'ö').normalize('NFD')
+    .replace(/a\u030a/g, 'å').replace(/a\u0308/g, 'ä').replace(/o\u0308/g, 'ö').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9åäö%,.&]+/g, ' ').trim();
+  // olika namn på samma sak – en sökning på det ena hittar också det andra (gäller varans namn och varumärke; kassanamnet
+  // söks som det står i kassan)
+  const SYNONYMER = [['toalettpapper', 'toapapper']];
+  const synonymer = t => SYNONYMER.filter(g => g.some(w => t.indexOf(w) >= 0)).map(g => g.join(' ') + ' ').join('');
   const MEJERI = /mjolk|yoghurt|filmjolk|kefir|gradd|creme fraiche|kvarg|latte|o'?boy|pucko|cocio|proteinshake|milkshake|drickyoghurt|yalla/;
   function setProdukter(rader) {
     produkter = (rader || []).filter(r => r && r[0] && r[1]).map((r, i) => {
-      const hay = ' ' + norm([r[1], r[4], r[5]].join(' ')) + ' ';
+      const text = [r[1], r[4], r[5]].join(' '), syn = synonymer(norm(r[1] + ' ' + r[4]));
+      const hay = ' ' + norm(text) + ' ' + syn, hayA = ' ' + normA(text) + ' ' + syn;
       return { ean: String(r[0]), namn: r[1], mangd: r[2] || '', enhet: r[3] || '', vm: r[4] || '', kassa: r[5] || '', koll: !!r[6], pant: +r[7] || 0, i,
-        hay, kompakt: hay.replace(/ /g, ''), namnN: ' ' + norm(r[1]), g14: ('00000000000000' + String(r[0])).slice(-14) };
+        hay, kompakt: hay.replace(/ /g, ''), hayA, kompaktA: hayA.replace(/ /g, ''), g14: ('00000000000000' + String(r[0])).slice(-14) };
     });
     $('#psokBox').hidden = !produkter.length;
     ritaBilder();
     visaRekpris();
     if (CFG.mode === 'demo' && produkter.length) $('#psokHint').textContent = `Provversionen har ${produkter.length} exempelvaror – prova nocco, marabou eller snickers. I den riktiga appen söker butiken i hela produktregistret.`;
   }
+  // Alla träffar, mest sålda först (registrets ordning), i tre grupper:
+  //   1. varje sökord står först eller sist i ett ord (”Coca-Cola”, ”Mellanmjölk”, ”Mjölkchoklad”) – ett sökord på en
+  //      eller två bokstäver måste vara ett helt ord (”öl” → ”Alkoholfri Öl”, ”te” → ”Te”)
+  //   2. korta sökord först eller sist i ett ord (”Ölkorv”, ”White”)
+  //   3. sökordet står bara mitt i ett annat ord (”cola” i ”Chocolate”)
+  // Ett ord med å, ä eller ö söks exakt (”öl” hittar inte ”Cola”); utan dem hittas även ord med å, ä och ö (”mjolk” →
+  // ”Mjölk”). Ord med minst sex tecken hittas också över mellanslag (”redbull”, ”pepsimax”) – kortare ord inte, annars
+  // blir det skräpträffar (”red” i ”köttbullaR EDiths”). Streckkod: exakt träff, annars alla där siffrorna ingår.
   function sok(q) {
-    const t = norm(q);
-    if (!t) return [];
-    const siffror = q.replace(/\s/g, '');
+    const siffror = String(q || '').replace(/\s/g, '');
     if (/^\d{4,14}$/.test(siffror)) {
       const g = ('00000000000000' + siffror).slice(-14);
       const exakt = produkter.filter(p => p.g14 === g);
-      if (exakt.length) return exakt;
-      return produkter.filter(p => p.ean.indexOf(siffror) >= 0).slice(0, 8);
+      return exakt.length ? exakt : produkter.filter(p => p.ean.indexOf(siffror) >= 0);
     }
-    const ord = t.split(' ').filter(Boolean);
-    const ut = [];
+    const ord = normA(q).split(' ').filter(Boolean).map(w => /[åäö]/.test(w) ? { w, a: true } : { w: norm(w), a: false }).filter(o => o.w);
+    if (!ord.length) return [];
+    const grupp = [[], [], []];
     for (const p of produkter) {
-      let ok = true, start = 0;
-      for (const w of ord) {
-        if (p.hay.indexOf(w) < 0 && p.kompakt.indexOf(w) < 0) { ok = false; break; }
-        if (p.namnN.indexOf(' ' + w) >= 0) start++;
+      let g = 0, ok = true;
+      for (const { w, a } of ord) {
+        const h = a ? p.hayA : p.hay;
+        if (h.indexOf(w) < 0 && (w.length < 6 || (a ? p.kompaktA : p.kompakt).indexOf(w) < 0)) { ok = false; break; }
+        if (h.indexOf(' ' + w + ' ') >= 0) continue;                                    // helt ord
+        g = Math.max(g, h.indexOf(' ' + w) >= 0 || h.indexOf(w + ' ') >= 0 ? (w.length <= 2 ? 1 : 0) : 2);
       }
-      if (ok) ut.push({ p, s: (start === ord.length ? 0 : start ? 1 : 2) * 1e6 + p.i });
+      if (ok) grupp[g].push(p);
     }
-    return ut.sort((a, b) => a.s - b.s).slice(0, 8).map(x => x.p);
+    return grupp[0].concat(grupp[1], grupp[2]);
   }
   function storlekText(p) { return p.mangd ? `${p.mangd} ${p.enhet}`.trim() : ''; }
   const arDryck = p => ['ml', 'cl', 'l'].includes(p.enhet) && !MEJERI.test(norm(p.namn + ' ' + p.kassa));
   function pantVarning() {
     return !!(valdProdukt && valdHelt && valdProdukt.pant === 0 && arDryck(valdProdukt) && !$('#pant').checked && $('#produkt').value === valdProdukt.namn);
   }
+  // Träfflistan under en sökruta: alla träffar med antalet överst, och man skrollar i listan. Raderna ritas i omgångar
+  // när man skrollar eller stegar med piltangenterna, så att även tusentals träffar går snabbt i mobilen.
+  function traffLista(sokruta, lista, prefix, radHtml, tomText) {
+    const OMGANG = 40;
+    const L = { traffar: [], aktiv: -1, ritade: 0 };
+    const rita = till => {
+      const slut = Math.min(L.traffar.length, Math.max(till, L.ritade + OMGANG));
+      let html = '';
+      for (let i = L.ritade; i < slut; i++) html += `<li role="option" id="${prefix}-${i}" data-i="${i}" aria-selected="${i === L.aktiv}">${radHtml(L.traffar[i])}</li>`;
+      if (html) lista.insertAdjacentHTML('beforeend', html);
+      L.ritade = Math.max(L.ritade, slut);
+    };
+    L.visa = traffar => {
+      const n = traffar.length;
+      L.traffar = traffar; L.aktiv = n ? 0 : -1; L.ritade = 0;
+      lista.innerHTML = n ? `<li class="antal" role="presentation">${n === 1 ? '1 vara' : n.toLocaleString('sv-SE') + ' varor'} · mest sålda först</li>`
+        : `<li class="tom">${tomText}</li>`;
+      rita(0);
+      lista.scrollTop = 0;
+      lista.hidden = false;
+      sokruta.setAttribute('aria-expanded', 'true');
+      sokruta.setAttribute('aria-activedescendant', n ? prefix + '-0' : '');
+    };
+    L.markera = i => {
+      if (i < 0 || i >= L.traffar.length) return;
+      if (i >= L.ritade) rita(i + 1);
+      const fore = document.getElementById(prefix + '-' + L.aktiv);
+      if (fore) fore.setAttribute('aria-selected', 'false');
+      L.aktiv = i;
+      const li = document.getElementById(prefix + '-' + i);
+      if (li) { li.setAttribute('aria-selected', 'true'); li.scrollIntoView({ block: 'nearest' }); }
+      sokruta.setAttribute('aria-activedescendant', prefix + '-' + i);
+    };
+    L.stang = () => { lista.hidden = true; sokruta.setAttribute('aria-expanded', 'false'); sokruta.removeAttribute('aria-activedescendant'); };
+    L.rensa = () => { L.traffar = []; L.aktiv = -1; L.ritade = 0; L.stang(); };
+    // piltangenter (en rad), PageUp/PageDown (åtta rader) och Enter i sökrutan; ingen runtgång från sista till första
+    L.tangent = (ev, oppna, valj) => {
+      const n = L.traffar.length, oppen = !lista.hidden;
+      const steg = { ArrowDown: 1, ArrowUp: -1, PageDown: 8, PageUp: -8 }[ev.key];
+      if (steg && n) { ev.preventDefault(); if (!oppen) { if (steg > 0) oppna(); } else L.markera(Math.min(Math.max(L.aktiv + steg, 0), n - 1)); return true; }
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        if (oppen && L.aktiv >= 0 && L.traffar[L.aktiv]) valj(L.traffar[L.aktiv]);
+        else { oppna(); if (L.traffar.length === 1) valj(L.traffar[0]); }
+        return true;
+      }
+      return false;
+    };
+    lista.addEventListener('scroll', () => { if (L.ritade < L.traffar.length && lista.scrollTop + lista.clientHeight >= lista.scrollHeight - 200) rita(0); }, { passive: true });
+    return L;
+  }
+  const psokL = traffLista($('#psok'), $('#psokLista'), 'ps',
+    p => `<b>${E.esc(p.namn)}</b><span>${E.esc([storlekText(p), p.vm && !norm(p.namn).includes(norm(p.vm)) ? p.vm : '', p.ean].filter(Boolean).join(' · '))}</span>`,
+    'Ingen vara hittades – skriv namnet själv nedan.');
+  const bsokL = traffLista($('#bsok'), $('#bsokLista'), 'bs',
+    p => `<b>${E.esc(p.namn)}</b><span>${E.esc([storlekText(p), p.ean].filter(Boolean).join(' · '))}</span>`,
+    'Ingen vara hittades.');
   function visaTraffar() {
-    const lista = $('#psokLista'), q = $('#psok').value;
-    psokTraffar = sok(q);
-    psokAktiv = psokTraffar.length ? 0 : -1;
-    if (!q.trim()) { stangLista(); return; }
-    lista.innerHTML = psokTraffar.length
-      ? psokTraffar.map((p, i) => `<li role="option" id="ps-${i}" data-i="${i}" aria-selected="${i === psokAktiv}"><b>${E.esc(p.namn)}</b><span>${E.esc([storlekText(p), p.vm && !norm(p.namn).includes(norm(p.vm)) ? p.vm : '', p.ean].filter(Boolean).join(' · '))}</span></li>`).join('')
-      : '<li class="tom">Ingen vara hittades – skriv namnet själv nedan.</li>';
-    lista.hidden = false;
-    $('#psok').setAttribute('aria-expanded', 'true');
-    $('#psok').setAttribute('aria-activedescendant', psokAktiv >= 0 ? 'ps-' + psokAktiv : '');
+    const q = $('#psok').value;
+    if (!q.trim()) { psokL.rensa(); return; }
+    psokL.visa(sok(q));
   }
-  function markera(i) {
-    psokAktiv = i;
-    $$('#psokLista li[role=option]').forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
-    const li = $('#ps-' + i); if (li) li.scrollIntoView({ block: 'nearest' });
-    $('#psok').setAttribute('aria-activedescendant', i >= 0 ? 'ps-' + i : '');
-  }
-  function stangLista() { $('#psokLista').hidden = true; $('#psok').setAttribute('aria-expanded', 'false'); $('#psok').removeAttribute('aria-activedescendant'); }
+  const stangLista = () => psokL.stang();
   function avmarkeraKampanj() {
     activeCamp = null;
     $$('.camp').forEach(x => x.setAttribute('aria-pressed', 'false'));
@@ -2180,42 +2245,26 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   $('#psok').addEventListener('input', () => { clearTimeout(blurTimer); visaTraffar(); });
   $('#psok').addEventListener('focus', () => { clearTimeout(blurTimer); if ($('#psok').value.trim()) visaTraffar(); });
   $('#psok').addEventListener('keydown', ev => {
-    const n = psokTraffar.length;
-    if (ev.key === 'ArrowDown' && n) { ev.preventDefault(); if ($('#psokLista').hidden) visaTraffar(); else markera((psokAktiv + 1) % n); }
-    else if (ev.key === 'ArrowUp' && n) { ev.preventDefault(); markera((psokAktiv - 1 + n) % n); }
-    else if (ev.key === 'Enter') { ev.preventDefault(); if (!$('#psokLista').hidden && psokAktiv >= 0 && psokTraffar[psokAktiv]) valjProdukt(psokTraffar[psokAktiv]); else { visaTraffar(); if (psokTraffar.length === 1) valjProdukt(psokTraffar[0]); } }
-    else if (ev.key === 'Escape') { stangLista(); }
+    if (psokL.tangent(ev, visaTraffar, p => valjProdukt(p))) return;
+    if (ev.key === 'Escape') stangLista();
   });
   $('#psokLista').addEventListener('mousedown', ev => ev.preventDefault()); // behåll fokus i sökrutan
-  $('#psokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjProdukt(psokTraffar[+li.dataset.i]); });
+  $('#psokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjProdukt(psokL.traffar[+li.dataset.i]); });
   $('#psok').addEventListener('blur', () => { clearTimeout(blurTimer); blurTimer = setTimeout(stangLista, 150); });
 
   /* ---------- fler sorter på skylten (bara bilden läggs till) ---------- */
-  let bsokTraffar = [], bsokAktiv = -1, bsokBlur = null;
+  let bsokBlur = null;
   function visaSortSok(visa) {
     $('#sortBox').hidden = !visa;
     $('#sortBtn').setAttribute('aria-expanded', String(!!visa));
-    if (!visa) { $('#bsok').value = ''; stangSortLista(); }
+    if (!visa) { $('#bsok').value = ''; bsokL.rensa(); }
   }
-  function stangSortLista() { $('#bsokLista').hidden = true; $('#bsok').setAttribute('aria-expanded', 'false'); $('#bsok').removeAttribute('aria-activedescendant'); }
+  function stangSortLista() { bsokL.stang(); }
   function visaSortTraffar() {
-    const q = $('#bsok').value, lista = $('#bsokLista');
+    const q = $('#bsok').value;
+    if (!q.trim()) { bsokL.rensa(); return; }
     const redan = new Set(bilder.map(b => b.ean).concat(vantar.map(v => v.ean)).filter(Boolean));
-    bsokTraffar = sok(q).filter(p => !redan.has(p.ean));
-    bsokAktiv = bsokTraffar.length ? 0 : -1;
-    if (!q.trim()) { stangSortLista(); return; }
-    lista.innerHTML = bsokTraffar.length
-      ? bsokTraffar.map((p, i) => `<li role="option" id="bs-${i}" data-i="${i}" aria-selected="${i === bsokAktiv}"><b>${E.esc(p.namn)}</b><span>${E.esc([storlekText(p), p.ean].filter(Boolean).join(' · '))}</span></li>`).join('')
-      : '<li class="tom">Ingen vara hittades.</li>';
-    lista.hidden = false;
-    $('#bsok').setAttribute('aria-expanded', 'true');
-    $('#bsok').setAttribute('aria-activedescendant', bsokAktiv >= 0 ? 'bs-' + bsokAktiv : '');
-  }
-  function markeraSort(i) {
-    bsokAktiv = i;
-    $$('#bsokLista li[role=option]').forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
-    const li = $('#bs-' + i); if (li) li.scrollIntoView({ block: 'nearest' });
-    $('#bsok').setAttribute('aria-activedescendant', i >= 0 ? 'bs-' + i : '');
+    bsokL.visa(sok(q).filter(p => !redan.has(p.ean)));
   }
   function valjSort(p) { visaSortSok(false); laggTillSort(p); }
   async function laggTillSort(p) {
@@ -2257,14 +2306,11 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   $('#bsok').addEventListener('input', () => { clearTimeout(bsokBlur); visaSortTraffar(); });
   $('#bsok').addEventListener('focus', () => { clearTimeout(bsokBlur); if ($('#bsok').value.trim()) visaSortTraffar(); });
   $('#bsok').addEventListener('keydown', ev => {
-    const n = bsokTraffar.length;
-    if (ev.key === 'ArrowDown' && n) { ev.preventDefault(); if ($('#bsokLista').hidden) visaSortTraffar(); else markeraSort((bsokAktiv + 1) % n); }
-    else if (ev.key === 'ArrowUp' && n) { ev.preventDefault(); markeraSort((bsokAktiv - 1 + n) % n); }
-    else if (ev.key === 'Enter') { ev.preventDefault(); if (!$('#bsokLista').hidden && bsokAktiv >= 0 && bsokTraffar[bsokAktiv]) valjSort(bsokTraffar[bsokAktiv]); else { visaSortTraffar(); if (bsokTraffar.length === 1) valjSort(bsokTraffar[0]); } }
-    else if (ev.key === 'Escape') { if ($('#bsokLista').hidden) visaSortSok(false); else stangSortLista(); }
+    if (bsokL.tangent(ev, visaSortTraffar, valjSort)) return;
+    if (ev.key === 'Escape') { if ($('#bsokLista').hidden) visaSortSok(false); else stangSortLista(); }
   });
   $('#bsokLista').addEventListener('mousedown', ev => ev.preventDefault());
-  $('#bsokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjSort(bsokTraffar[+li.dataset.i]); });
+  $('#bsokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjSort(bsokL.traffar[+li.dataset.i]); });
   $('#bsok').addEventListener('blur', () => { clearTimeout(bsokBlur); bsokBlur = setTimeout(stangSortLista, 150); });
 
   /* ---------- rekpriser: kedjans rekommenderade pris som stöd vid ordinarie pris – inget fylls i ---------- */

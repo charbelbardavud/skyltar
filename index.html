@@ -97,7 +97,7 @@ button, input, select { font: inherit; color: inherit; }
 .step-h h2 { font-size: 1.12rem; }
 .step-h p { margin: 0; color: var(--muted); font-size: .85rem; }
 .row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.field { display: grid; gap: 5px; min-width: 0; }
+.field { display: grid; gap: 5px; min-width: 0; align-content: start; } /* fält bredvid varandra står i linje även när ett har en rad under sig */
 .field > label, .lbl { font-size: .84rem; font-weight: 600; }
 .hint { font-size: .8rem; color: var(--muted); margin: 0; }
 input[type=text], input[type=number], input:not([type]), select.input {
@@ -110,6 +110,18 @@ input[type=text]:focus, input:not([type]):focus { border-color: var(--accent); o
 .invalid input, input.invalid { border-color: var(--err-ink) !important; }
 .field-msg { margin: 0; font-size: .8rem; color: var(--err-ink); font-weight: 600; }
 .field-msg:empty { display: none; }
+.field-warn { margin: 0; font-size: .8rem; line-height: 1.4; color: var(--warn-ink); background: var(--warn-bg); border-radius: 8px; padding: 6px 10px; font-weight: 600; overflow-wrap: anywhere; }
+.field-warn:empty { display: none; }
+
+/* text högst upp (rubriken) */
+#rubrik { text-transform: uppercase; font-weight: 700; letter-spacing: .02em; }
+#rubrik::placeholder { text-transform: none; font-weight: 400; letter-spacing: 0; }
+.rubrik-rad { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+.textbtn { background: none; border: 0; padding: 4px 2px; color: var(--accent); font-weight: 700; font-size: .85rem; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; text-align: left; }
+
+/* rekpriser: kedjans rekommenderade pris som stöd vid ordinarie pris */
+.rekpris-val { max-width: 420px; }
+.rekpris-info { margin: 0; font-size: .8rem; line-height: 1.4; color: var(--ink); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }
 
 /* segment och val */
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -261,6 +273,16 @@ button.filebtn { font: inherit; font-weight: 600; font-size: .88rem; color: var(
             <div class="step-h"><span class="n">1</span><h2 id="s1">Skylt</h2></div>
             <div class="types" id="types" role="radiogroup" aria-label="Skylttyp"></div>
             <p class="when" id="when"></p>
+            <div class="field" id="rubrikField">
+              <label for="rubrik">Text högst upp</label>
+              <input id="rubrik" type="text" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-describedby="rubrikHint">
+              <p class="field-msg" data-for="rubrik"></p>
+              <p class="field-warn" data-for="rubrik"></p>
+              <div class="rubrik-rad">
+                <p class="hint" id="rubrikHint">Ändra texten om du vill, t.ex. till HELGPRIS! Reglerna följer skylttypen, inte texten.</p>
+                <button type="button" class="textbtn" id="rubrikReset" hidden></button>
+              </div>
+            </div>
           </section>
 
           <section class="step" aria-labelledby="s2">
@@ -340,6 +362,7 @@ button.filebtn { font: inherit; font-weight: 600; font-size: .88rem; color: var(
               <label><input type="radio" name="erbjudande" value="st"><span>Styckpris</span></label>
               <label><input type="radio" name="erbjudande" value="multi"><span>Flerköp (X för Y)</span></label>
               <label><input type="radio" name="erbjudande" value="kg"><span>Kilopris</span></label>
+              <label><input type="radio" name="erbjudande" value="villkor"><span>Villkorat pris</span></label>
             </div>
             <div class="row">
               <div class="field" id="antalField">
@@ -352,15 +375,27 @@ button.filebtn { font: inherit; font-weight: 600; font-size: .88rem; color: var(
                 <div class="money"><input id="pris" type="text" inputmode="decimal" placeholder="38"><span class="unit" id="prisUnit">kr</span></div>
                 <p class="field-msg" data-for="pris"></p>
               </div>
+              <div class="field" id="villkorField" hidden>
+                <label for="villkorBelopp">Vid köp av andra varor för minst</label>
+                <div class="money"><input id="villkorBelopp" type="text" inputmode="decimal" placeholder="200" aria-describedby="villkorHint"><span class="unit">kr</span></div>
+                <p class="field-msg" data-for="villkorBelopp"></p>
+              </div>
             </div>
+            <p class="hint" id="villkorHint" hidden>Priset gäller när kunden handlar andra varor för minst beloppet. Villkoret står med stor text direkt under priset på skylten.</p>
 
             <div class="subbox" id="sankBox">
               <h3>Prisjämförelse – krävs när skylten säger att priset är sänkt</h3>
+              <div class="field rekpris-val" id="rekprisField" hidden>
+                <label for="rekprislista">Rekpriser</label>
+                <select id="rekprislista" class="input" aria-describedby="rekprisHint"><option value="">Inga rekpriser</option></select>
+                <p class="hint" id="rekprisHint">Visar kedjans rekommenderade pris under Ordinarie pris, som stöd. Inget fylls i automatiskt.</p>
+              </div>
               <div class="row">
                 <div class="field">
                   <label for="ordPris" id="ordLbl">Ordinarie pris</label>
                   <div class="money"><input id="ordPris" type="text" inputmode="decimal" placeholder="24,90"><span class="unit" id="ordUnit">kr</span></div>
                   <p class="field-msg" data-for="ordPris"></p>
+                  <p class="rekpris-info" id="rekprisInfo" role="status" hidden></p>
                 </div>
                 <div class="field">
                   <label for="lagsta30" id="l30Lbl">Lägsta pris senaste 30 dagarna</label>
@@ -466,6 +501,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
  *
  *  - analyze(state)      kontrollerar uppgifterna och räknar fram
  *                        styckpris, jämförpris och texterna på skylten
+ *                        (även villkorat pris och egen text högst upp)
  *  - pages(state, a, f)  bygger sidor (A4, 2×A5, 4×A6) som ritlistor i mm
  *  - svg(page)           förhandsvisning (identisk geometri som PDF:en)
  *  - pdf(pages)          utskriftsklar PDF (vektor, egen PDF-skrivare)
@@ -510,7 +546,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     stormarknad: {
       id: 'stormarknad', namn: 'STORMARKNADSPRIS NÄRA DIG!', rubrik: ['STORMARKNADSPRIS', 'NÄRA DIG!'],
       nar: 'Alltid bra pris under längre tid, t.ex. stående multipris (mjölk – alltid 10 kr).',
-      head: PAL.yellow, headDark: PAL.yellowDark, headText: PAL.black, headShadow: null,
+      head: PAL.yellow, headDark: PAL.yellowDark, headText: PAL.priceRed, headShadow: PAL.redDark,
       bg: PAL.white, ray: PAL.ray, burst: PAL.gold, price: PAL.priceRed, multiText: PAL.black,
       sparks: PAL.yellowDark, footer: 'one', sankning: false, bubbla: 'bottom', logo: [155.5, 94], burstC: [143, 191]
     },
@@ -576,6 +612,11 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const [i, d] = n.toFixed(2).split('.');
     return i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + d;
   }
+  function fmtBelopp(n) { // villkorets belopp: 200 -> "200", 1000 -> "1 000", 199.5 -> "199,50"
+    const r = Math.round(n * 100) / 100;
+    if (Math.abs(r - Math.round(r)) < 0.001) return String(Math.round(r)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+    return fmtKr(r);
+  }
   function fmtBig(n) { // 38 -> "38:-", 19.9 -> "19:90", 1249 -> "1 249:-"
     const r = Math.round(n * 100) / 100;
     const kr = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
@@ -590,8 +631,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
    * ------------------------------------------------------------------ */
   function defaults() {
     return {
-      typ: 'battre', produkt: '', undertext: '',
-      erbjudande: 'multi', antal: '2', pris: '',
+      typ: 'battre', rubrik: '', produkt: '', undertext: '',
+      erbjudande: 'multi', antal: '2', pris: '', villkorBelopp: '',
       mangd: '', mangdMax: '', enhet: 'g', flerStorlekar: false, pant: false,
       ordPris: '', ordFran: false, lagsta30: '', lagstaSammaSomOrd: false, farskvara: false,
       bubbla: 'auto', bubbelText: '', galler: '', maxPerKund: '',
@@ -607,6 +648,28 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       if (t.includes(' ' + ww + ' ')) return w;
     }
     return null;
+  }
+
+  // Villkorat pris: texten på skylten, i två rader (belopp som "200" eller "1 000").
+  function villkorRader(belopp) { return ['vid köp av andra varor', `för minst ${belopp} kr`]; }
+
+  // Egen text högst upp. Rubrikens typsnitt (Exo 2 Black Italic, stilen 'h') har bara versaler, siffror och några tecken.
+  const MAX_RUBRIK = 30;
+  // Ord som säger att priset är sänkt – på STORMARKNADSPRIS och NYHET (utan prisjämförelse) ger de en mjuk varning
+  // (REA även i sammansättningar som HELGREA och REAPRIS; SPARA bara som eget ord – inte SPARRIS)
+  const SANKT_RUBRIK = /%|klipp|rabatt|sänk|nedsatt|extrapris|halvpris|halva priset|bättre pris|lägre pris|billigare|(^|[^\p{L}])rea|rea($|[^\p{L}])|sale($|[^\p{L}])|(^|[^\p{L}])(spara|sparar|spar)($|[^\p{L}])|(^|\s)-\s?\d/iu;
+  function rubrikNorm(s) {
+    // mobilens ”smarta” tecken blir de som finns i typsnittet; versaler som på skylten
+    return String(s || '').replace(/[–—‐‑−]/g, '-').replace(/[’‘´`]/g, "'").replace(/…/g, '...')
+      .replace(/\s+/g, ' ').trim().toUpperCase();
+  }
+  function rubrikSaknas(text) { // tecken som rubrikens typsnitt inte kan rita (de skulle bli ”?”)
+    const ut = [];
+    for (const ch of Array.from(String(text))) {
+      if (/\s/.test(ch) || ch === '?') continue;
+      if (resolveChar('h', ch) === '?' && !ut.includes(ch)) ut.push(ch);
+    }
+    return ut;
   }
 
   function analyze(st, opts) {
@@ -630,8 +693,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const vhit = wordHit(produkt + ' ' + undertext, varning);
     if (vhit && !hit) warn('produkt', `“${vhit}”: alkohol (även folköl) ska marknadsföras med särskild måttfullhet och läkemedel har egna regler. Stäm av med HQ innan skylten sätts upp.`);
 
-    // Pris
-    const erb = ['st', 'multi', 'kg'].includes(st.erbjudande) ? st.erbjudande : 'st';
+    // Pris (villkor = villkorat pris: varans pris gäller vid köp av andra varor för minst X kr)
+    const erb = ['st', 'multi', 'kg', 'villkor'].includes(st.erbjudande) ? st.erbjudande : 'st';
     d.erbjudande = erb;
     const pris = parseKr(st.pris);
     let antal = 1;
@@ -650,6 +713,19 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       d.bigText = fmtBig(pris);
       d.prefix = erb === 'multi' ? `${antal} för` : '';
       d.suffix = erb === 'kg' ? '/kg' : '';
+    }
+    // Villkoret står på skylten med stor text direkt under priset: villkor för ett erbjudande ska framgå tydligt.
+    if (erb === 'villkor') {
+      const vb = parseKr(st.villkorBelopp);
+      if (vb === null) err('villkorBelopp', 'Fyll i villkoret: hur mycket kunden ska handla andra varor för, t.ex. 200 kr.');
+      else if (isNaN(vb) || vb <= 0) err('villkorBelopp', 'Beloppet i villkoret ska vara ett positivt tal, t.ex. 200.');
+      else {
+        d.villkorBelopp = vb;
+        d.villkorBeloppText = fmtBelopp(vb);
+        d.villkorRader = villkorRader(d.villkorBeloppText);
+        d.villkorText = d.villkorRader.join(' ');
+        checks.push({ ok: true, msg: `Villkoret står med stor text direkt under priset: ”${d.villkorText.replace(/\u00A0/g, ' ')}”.` });
+      }
     }
 
     // Jämförpris
@@ -733,6 +809,22 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       d.bubbelText = t;
     }
 
+    // Text högst upp: skylttypens egen rubrik, eller butikens egen text (t.ex. HELGPRIS!).
+    // Reglerna följer skylttypen – inte texten. En egen text som låter som ett sänkt pris på en skylt
+    // utan prisjämförelse ger en mjuk varning.
+    const rubrik = rubrikNorm(st.rubrik);
+    d.rubrikEgen = !!rubrik && rubrik !== T.namn;
+    if (d.rubrikEgen) {
+      d.rubrikText = rubrik;
+      const saknas = rubrikSaknas(rubrik);
+      if (Array.from(rubrik).length > MAX_RUBRIK) err('rubrik', `Högst ${MAX_RUBRIK} tecken i texten högst upp.`);
+      else if (saknas.length) err('rubrik', `${saknas.map(c => '”' + c + '”').join(' ')} finns inte i rubrikens typsnitt. Använd bokstäver, siffror och ! ? . , - & % : + / ' i texten högst upp.`);
+      else if (rubrikPlacering(T, rubrik).size < RUBRIK_MIN) err('rubrik', 'Texten högst upp får inte plats (högst två rader). Korta den eller använd kortare ord, t.ex. HELGPRIS!');
+      if (!sankning && SANKT_RUBRIK.test(rubrik)) {
+        warnings.push({ field: 'rubrik', msg: `”${rubrik}” låter som ett sänkt pris, men ${T.namn} visar inte ordinarie pris och lägsta pris de senaste 30 dagarna. Välj BÄTTRE PRIS! eller SUPER KLIPP! så kommer prisuppgifterna med.`, soft: true });
+      }
+    }
+
     // Extra rader
     const extra = [];
     const g = String(st.galler || '').trim();
@@ -772,6 +864,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     if (d.sankning && !d.ordText) d.ordText = 'Ord pris X' + per;
     if (d.sankning && !st.farskvara && !d.lagstaText) d.lagstaText = 'Lägsta pris senaste 30 dagar: X' + per;
     if (d.bubbla === 'egen' && !d.bubbelText) d.bubbelText = 'Din text här';
+    if (d.erbjudande === 'villkor' && !d.villkorRader) { d.villkorRader = villkorRader('X'); d.villkorText = d.villkorRader.join(' '); }
     return Object.assign({}, a, { d, preview: true });
   }
 
@@ -1132,8 +1225,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     P(H.top, T.head);
     if (T.sparks) for (const tri of ASSETS.sparks) P(polyCmds(tri), T.sparks);
 
-    // Rubrik
-    headline(items, T);
+    // Rubrik (skylttypens egen, eller butikens text högst upp)
+    headline(items, T, d);
 
     // Logga
     items.push(...logoItems(T.logo[0], T.logo[1], 40.1));
@@ -1171,7 +1264,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const bc = hasImg ? T.burstC : [112, 191];
     const bs = hasImg ? 1 : 1.15;
     P(burstCmds(bc[0], bc[1], bs), T.burst);
-    if (d.bigText) priceBlock(items, a, bc, bs, hasImg);
+    if (d.bigText) priceBlock(items, a, bc, bs, hasImg, boost);
 
     // Pratbubbla
     if (d.bubbla !== 'ingen' && d.bubbelText) bubble(items, T, d.bubbelText);
@@ -1182,20 +1275,61 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     return { w: 210, h: 297, items };
   }
 
-  function headline(items, T) {
+  // Egen text högst upp: ytan där texten får stå, per skylttyp (mm i A4-skylten). Ytan är densamma som skylttypens
+  // egen rubrik använder: cx = mitten, cy = textblockets mittlinje, b/h = största bredd/höjd, max1/max2 = största
+  // textstorlek på en/två rader. Ytan går fri från loggan, gnistorna och kanten på den V-formade plattan.
+  const RUBRIK_YTA = {
+    battre: { cx: 95.5, cy: 54.5, b: 108, h: 49, max1: 40, max2: 31 },
+    superklipp: { cx: 95.5, cy: 54.5, b: 108, h: 49, max1: 40, max2: 31 },
+    stormarknad: { cx: 92, cy: 51, b: 112, h: 40, max1: 40, max2: 30 },
+    nyhet: { cx: 98, cy: 50, b: 146, h: 40, max1: 44, max2: 30 }
+  };
+  const RUBRIK_MIN = 10;          // mm: mindre än så får texten inte plats (STORMARKNADSPRIS-raden är 9,9 mm)
+  const RUBRIK_CAP = 0.69, RUBRIK_RAD = 0.94;   // versalhöjd och radavstånd i förhållande till textstorleken
+  function rubrikDjup(text) {     // hur högt och djupt radens tecken når (Å, Ä, É över versalerna; Q och komma under baslinjen)
+    let upp = 0, ned = 0;
+    for (const k of textCmds(text, 'h', 1, 0, 0)) for (let i = 2; i < k.length; i += 2) { upp = Math.max(upp, -k[i]); ned = Math.max(ned, k[i]); }
+    return { upp, ned };
+  }
+  // Bästa radbrytning (en eller två rader, bara mellan ord) = den som ger störst text. Radavståndet ökar om ett Å, Ä eller Ö
+  // på andra raden (eller ett Q eller komma på första) annars skulle nå den andra raden; blocket rymmer sista radens komma/Q.
+  function rubrikPlacering(T, text) {
+    const Y = RUBRIK_YTA[T.id] || RUBRIK_YTA.battre;
+    const ord = String(text).split(' ').filter(Boolean);
+    const alt = [[ord.join(' ')]];
+    for (let i = 1; i < ord.length; i++) alt.push([ord.slice(0, i).join(' '), ord.slice(i).join(' ')]);
+    let bast = null;
+    for (const rader of alt) {
+      const n = rader.length;
+      const bredast = Math.max(...rader.map(r => measure(r, 'h', 1)));
+      const rad = n === 2 ? Math.max(RUBRIK_RAD, rubrikDjup(rader[1]).upp + rubrikDjup(rader[0]).ned + 0.05) : 0;
+      const ned = rubrikDjup(rader[n - 1]).ned;
+      const size = Math.min(n === 1 ? Y.max1 : Y.max2, bredast > 0 ? Y.b / bredast : Y.max1, Y.h / (RUBRIK_CAP + rad + ned));
+      if (!bast || size > bast.size + 1e-6) bast = { rader, size, rad, ned };
+    }
+    const s = bast.size, hojd = s * (RUBRIK_CAP + bast.rad + bast.ned);
+    const y0 = Y.cy - hojd / 2 + s * RUBRIK_CAP;
+    return { rader: bast.rader, size: s, cx: Y.cx, baslinjer: bast.rader.map((r, i) => y0 + i * s * bast.rad) };
+  }
+
+  function headline(items, T, d) {
     const shadow = T.headShadow;
     const draw = (txt, size, x, y) => {
       if (shadow) items.push({ t: 'path', cmds: textCmds(txt, 'h', size, x + size * 0.045, y + size * 0.034, { align: 'center' }), fill: shadow });
       items.push({ t: 'path', cmds: textCmds(txt, 'h', size, x, y, { align: 'center' }), fill: T.headText });
     };
-    if (T.id === 'battre' || T.id === 'superklipp') {
+    if (d && d.rubrikEgen && d.rubrikText) {
+      const R = rubrikPlacering(T, d.rubrikText);
+      R.rader.forEach((r, i) => draw(r, R.size, R.cx, R.baslinjer[i]));
+    } else if (T.id === 'battre' || T.id === 'superklipp') {
       const [l1, l2] = T.rubrik;
       const s = Math.min(fitSize(l1, 'h', 108, 31), fitSize(l2, 'h', 108, 31));
       draw(l1, s, 95.5, 51.5);
       draw(l2, s, 95.5, 51.5 + s * 0.94);
     } else if (T.id === 'stormarknad') {
       const s1 = fitSize(T.rubrik[0], 'h', 104, 15), s2 = fitSize(T.rubrik[1], 'h', 112, 30);
-      draw(T.rubrik[0], s1, 92, 45);
+      // med skugga lyfts den lilla raden 1,2 mm, så att skuggan inte går ihop med prickarna i Ä på raden under
+      draw(T.rubrik[0], s1, 92, shadow ? 43.8 : 45);
       draw(T.rubrik[1], s2, 92, 45 + s2 * 0.92);
     } else {
       const s = fitSize(T.rubrik[0], 'h', 146, 44);
@@ -1203,7 +1337,19 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     }
   }
 
-  function priceBlock(items, a, bc, bs, hasImg) {
+  // Villkorat pris: villkoret i en mörk etikett med vit fet text direkt under priset – samma utseende i alla skylttyper
+  // och läsbart mot stjärnan, bakgrunden och bilden. Bredden följer priset (lite bredare på A5/A6, där foten också
+  // förstoras) men håller sig minst 10 mm från skyltens högerkant.
+  function villkorEtikett(rader, cx, maxW, b) {
+    const bredd = Math.min(maxW * Math.min(b, 1.12), 2 * (200 - cx));
+    const w1 = Math.max(...rader.map(r => measure(r, 'm', 1)));
+    const size = Math.min(9 * b, bredd / (w1 + 1.2));
+    // höjd: första radens överstaplar (0,72 × storleken) till sista radens baslinje – den raden (”för minst 200 kr”) saknar nedstaplar
+    const padX = size * 0.6, padY = size * 0.42, lh = size * 1.16;
+    return { rader, size, padX, padY, lh, w: w1 * size + 2 * padX, h: 2 * padY + size * 0.74 + (rader.length - 1) * lh };
+  }
+
+  function priceBlock(items, a, bc, bs, hasImg, b) {
     const T = a.T, d = a.d;
     const maxW = hasImg ? 100 : 112;
     const maxSize = hasImg ? 62 : 68;
@@ -1218,8 +1364,12 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const preW = pre ? measure(pre, 'p', preS) : 0;
     if (pre && preW > maxW) s = s * maxW / preW;
     const capH = s * 0.69, preCap = pre ? s * 0.66 * 0.74 : 0, gap = pre ? s * 0.12 : 0;
-    const blockH = capH + gap + preCap;
-    const yBase = bc[1] + blockH / 2 - (hasImg ? 0 : 0);
+    // villkoret under priset (och under ”+ pant”); hela blocket centreras i stjärnan
+    const V = d.villkorRader ? villkorEtikett(d.villkorRader, bc[0], maxW, b || 1) : null;
+    const vTop = V ? (d.pant ? Math.max(5.2, s * 0.115) * 1.75 + 2 : Math.max(3, s * 0.075)) : 0;
+    const vH = V ? vTop + V.h : 0;
+    const blockH = capH + gap + preCap + vH;
+    const yBase = bc[1] + blockH / 2 - vH;
     const cx = bc[0];
     const W = totalW(s);
     const x0 = cx - W / 2;
@@ -1246,6 +1396,12 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     if (d.pant) {
       const ps = Math.max(5.2, s * 0.115);
       items.push({ t: 'path', cmds: textCmds('+ pant', 'm', ps, x0 + W, yBase + ps * 1.35, { align: 'right' }), fill: PAL.black });
+    }
+    if (V) {
+      const top = yBase + vTop;
+      items.push({ t: 'path', cmds: roundRectCmds(cx - V.w / 2, top, V.w, V.h, Math.min(V.size * 0.9, V.h / 2)), fill: PAL.ink });
+      let y = top + V.padY + V.size * 0.72;
+      for (const r of V.rader) { items.push({ t: 'path', cmds: textCmds(r, 'm', V.size, cx, y, { align: 'center' }), fill: PAL.white }); y += V.lh; }
     }
   }
 
@@ -1517,9 +1673,9 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   }
 
   const api = {
-    PAL, TYPES, UNITS, FORMATS, DEFAULT_SPARR, DEFAULT_VARNING, MAX_BILDER,
-    defaults, analyze, previewAnalysis, pages, svg, pdf, layoutSign, bildGrupp,
-    parseKr, parseNum, fmtKr, fmtBig, fmtJmf, measure, fitSize, wrapFit, textCmds, esc
+    PAL, TYPES, UNITS, FORMATS, DEFAULT_SPARR, DEFAULT_VARNING, MAX_BILDER, MAX_RUBRIK, RUBRIK_MIN,
+    defaults, analyze, previewAnalysis, pages, svg, pdf, layoutSign, bildGrupp, rubrikPlacering, rubrikNorm,
+    parseKr, parseNum, fmtKr, fmtBig, fmtJmf, fmtBelopp, measure, fitSize, wrapFit, textCmds, esc
   };
   root.SkyltEngine = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -1554,7 +1710,9 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     return r.json().then(j => { if (!j || !j.ok) throw new Error((j && j.fel) || 'Fel från servern'); return j.data; });
   }
   function apiHamta(param) {
-    const url = ENV.api + (ENV.api.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(param).toString();
+    // %20 för mellanslag (t.ex. prislistan ”Rekpriser Supermarket”) – entydigt för alla servrar
+    const q = Object.keys(param).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(param[k])).join('&');
+    const url = ENV.api + (ENV.api.indexOf('?') >= 0 ? '&' : '?') + q;
     return fetch(url, { credentials: 'omit', cache: 'no-store' }).then(apiSvar);
   }
   function apiSkicka(body) {
@@ -1566,6 +1724,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     produkter: () => ENV.gas ? gasAnrop('getProdukter') : apiHamta({ api: 'produkter' }),
     produktBild: ean => ENV.gas ? gasAnrop('getProduktBild', ean) : apiHamta({ api: 'produktbild', ean }),
     kampanjBild: rad => ENV.gas ? gasAnrop('getKampanjBild', rad) : apiHamta({ api: 'kampanjbild', rad }),
+    rekpriser: lista => ENV.gas ? gasAnrop('getRekpriser', lista) : apiHamta({ api: 'rekpriser', lista }),
     logga: rad => ENV.gas ? gasAnrop('loggaSkylt', rad) : apiSkicka({ api: 'logg', rad })
   };
   const ls = {
@@ -1573,7 +1732,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     set(k, v) { try { localStorage.setItem('skylt24.' + k, JSON.stringify(v)); } catch (e) { } }
   };
 
-  let config = { kampanjer: CFG.kampanjer || [], installningar: CFG.installningar || {} };
+  let config = { kampanjer: CFG.kampanjer || [], installningar: CFG.installningar || {}, rekprislistor: CFG.rekprislistor || [] };
   let state = E.defaults();
   // Bilderna på skylten, högst E.MAX_BILDER. Den första är huvudbilden (längst fram i gruppen).
   // { bild: { href, iw, ih, rgba }, raw (originalet, för att kunna slå av/på vit bakgrund), namn, ean, kalla: 'register' | 'egen' | 'kampanj' }
@@ -1614,7 +1773,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   })();
 
   /* ---------- läs/skriv formulär ---------- */
-  const TEXT = ['produkt', 'undertext', 'mangd', 'mangdMax', 'antal', 'pris', 'ordPris', 'lagsta30', 'bubbelText', 'galler', 'maxPerKund'];
+  const TEXT = ['rubrik', 'produkt', 'undertext', 'mangd', 'mangdMax', 'antal', 'pris', 'villkorBelopp', 'ordPris', 'lagsta30', 'bubbelText', 'galler', 'maxPerKund'];
   const BOOL = ['flerStorlekar', 'pant', 'ordFran', 'lagstaSammaSomOrd', 'farskvara'];
   function readForm() {
     const st = E.defaults();
@@ -1631,6 +1790,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   }
   function writeForm(st) {
     for (const k of TEXT) $('#' + k).value = st[k] == null ? '' : st[k];
+    // utan egen text visar fältet skylttypens rubrik (och följer med när typen byts)
+    if (!String(st.rubrik || '').trim()) $('#rubrik').value = (E.TYPES[st.typ] || E.TYPES.battre).namn;
     for (const k of BOOL) $('#' + k).checked = !!st[k];
     const set = (name, v) => { const el = $(`input[name=${name}][value="${v}"]`); if (el) el.checked = true; };
     set('typ', st.typ); set('enhet', st.enhet); set('erbjudande', st.erbjudande);
@@ -1642,8 +1803,10 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   function updateVisibility(st) {
     const T = E.TYPES[st.typ];
     $('#when').textContent = T.namn + ': ' + T.nar;
-    const multi = st.erbjudande === 'multi', kg = st.erbjudande === 'kg';
+    const multi = st.erbjudande === 'multi', kg = st.erbjudande === 'kg', villkor = st.erbjudande === 'villkor';
     $('#antalField').hidden = !multi;
+    $('#villkorField').hidden = !villkor;
+    $('#villkorHint').hidden = !villkor;
     $('#prisLbl').textContent = multi ? `Pris för ${E.parseNum(st.antal) || 'X'} st` : kg ? 'Kampanjpris per kg' : 'Kampanjpris';
     $('#prisUnit').textContent = kg ? 'kr/kg' : 'kr';
     $('#mangdField').hidden = kg;
@@ -1677,6 +1840,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     if (!state.format.length) a.errors.push({ field: 'format', msg: 'Välj minst ett format.' });
     a.ok = a.errors.length === 0;
     lastA = a;
+    visaRubrik(a);
     const pa = E.previewAnalysis(state, a);
     const pg = E.pages(state, pa, ['A4'])[0];
     const svg = E.svg(pg);
@@ -1687,14 +1851,39 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const fm = { A3: 'A3 (1 stor skylt)', A4: 'A4 (1 skylt)', A5: '2 × A5 på A4', A6: '4 × A6 på A4' };
     $('#cap').textContent = state.format.length ? 'PDF:en innehåller: ' + state.format.map(f => fm[f]).join(' + ') : '';
     renderChecks(a);
+    visaRekpris();
     ls.set('utkast', Object.assign({}, state, { bild: null, bilder: [] }));
     ls.set('format', state.format);
   }
   function schedule() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 110); }
 
+  /* ---------- text högst upp ---------- */
+  // Fältet visar skylttypens rubrik tills butiken skriver en egen. Knappen återställer typens rubrik.
+  function visaRubrik(a) {
+    const T = E.TYPES[state.typ] || E.TYPES.battre, knapp = $('#rubrikReset');
+    knapp.hidden = !a.d.rubrikEgen;
+    knapp.textContent = `Återställ till ${T.namn}`;
+    $('#rubrik').placeholder = T.namn;
+  }
+  const arStandardRubrik = (text, typ) => { const n = E.rubrikNorm(text); return !n || (!!E.TYPES[typ] && n === E.TYPES[typ].namn); };
+  $('#rubrikReset').addEventListener('click', () => {
+    $('#rubrik').value = (E.TYPES[state.typ] || E.TYPES.battre).namn;
+    render();
+    // knappen försvinner – på dator får fältet fokus i stället (i mobilen öppnas inte tangentbordet i onödan)
+    if (window.matchMedia && matchMedia('(pointer: fine)').matches) $('#rubrik').focus();
+  });
+  // ett tryck i fältet markerar standardrubriken, så att det man skriver ersätter den
+  $('#rubrik').addEventListener('focus', () => {
+    const el = $('#rubrik');
+    if (arStandardRubrik(el.value, state.typ)) setTimeout(() => { try { el.setSelectionRange(0, el.value.length); } catch (e) { } }, 0);
+  });
+
   function renderChecks(a) {
     $$('.field-msg').forEach(p => { p.textContent = ''; });
+    $$('.field-warn').forEach(p => { p.textContent = ''; });
     $$('.invalid').forEach(el => el.classList.remove('invalid'));
+    // varningar som hör till ett fält med plats för det (texten högst upp) visas också vid fältet
+    for (const w of a.warnings) { const el = $(`.field-warn[data-for="${w.field}"]`); if (el && !el.textContent) el.textContent = w.msg; }
     const touched = new Set(Object.keys(touchedFields));
     const items = [];
     for (const e of a.errors) {
@@ -1876,6 +2065,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     });
     $('#psokBox').hidden = !produkter.length;
     ritaBilder();
+    visaRekpris();
     if (CFG.mode === 'demo' && produkter.length) $('#psokHint').textContent = `Provversionen har ${produkter.length} exempelvaror – prova nocco, marabou eller snickers. I den riktiga appen söker butiken i hela produktregistret.`;
   }
   function sok(q) {
@@ -2076,6 +2266,55 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   $('#bsokLista').addEventListener('click', ev => { const li = ev.target.closest('li[data-i]'); if (li) valjSort(bsokTraffar[+li.dataset.i]); });
   $('#bsok').addEventListener('blur', () => { clearTimeout(bsokBlur); bsokBlur = setTimeout(stangSortLista, 150); });
 
+  /* ---------- rekpriser: kedjans rekommenderade pris som stöd vid ordinarie pris – inget fylls i ---------- */
+  let rekListor = [];       // prislistornas namn från servern (config.rekprislistor)
+  const rekData = {};       // prislista -> { status: 'laddar' | 'ok' | 'fel', data: { uppdaterad, priser: { streckkod med 14 siffror: pris } } }
+  const MANADER = ['jan', 'feb', 'mars', 'apr', 'maj', 'juni', 'juli', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  function datumSv(iso) {   // 2026-10-18 -> 18 okt 2026
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m && +m[2] >= 1 && +m[2] <= 12 ? `${+m[3]} ${MANADER[+m[2] - 1]} ${m[1]}` : '';
+  }
+  const rekEtikett = lista => /^rekpriser\s/i.test(lista) ? 'Rekpris ' + lista.replace(/^rekpriser\s+/i, '') : `Rekpris (${lista})`;
+  function visaRekprislistor() {
+    rekListor = (config.rekprislistor || []).map(n => String(n || '').trim()).filter(Boolean);
+    const sel = $('#rekprislista');
+    sel.innerHTML = '<option value="">Inga rekpriser</option>' + rekListor.map(n => `<option value="${E.esc(n)}">${E.esc(n)}</option>`).join('');
+    $('#rekprisField').hidden = !rekListor.length;       // utan prislistor syns ingen meny
+    const sparad = ls.get('rekprislista');               // butikens val sparas i webbläsaren
+    sel.value = rekListor.includes(sparad) ? sparad : '';
+    if (sel.value) hamtaRekpriser(sel.value);
+    visaRekpris();
+  }
+  function hamtaRekpriser(lista) {
+    if (rekData[lista] && rekData[lista].status !== 'fel') return;   // en gång per sidladdning (nytt försök bara efter fel)
+    rekData[lista] = { status: 'laddar' };
+    const klar = d => { rekData[lista] = { status: 'ok', data: d || { priser: {} } }; visaRekpris(); };
+    const fel = () => { rekData[lista] = { status: 'fel' }; visaRekpris(); };
+    if (SERVER) { try { server.rekpriser(lista).then(klar, fel); } catch (e) { fel(); } }
+    else setTimeout(() => klar((CFG.rekpriser || {})[lista]), 120);
+  }
+  function visaRekpris() {
+    const el = $('#rekprisInfo'), lista = $('#rekprislista').value;
+    const visa = t => { el.textContent = t; el.hidden = !t; };
+    if (!lista || !rekListor.includes(lista)) return visa('');
+    if (!valdProdukt) return visa(produkter.length ? 'Sök fram varan under Vara, så visas rekpriset här.' : '');
+    const R = rekData[lista];
+    if (!R || R.status === 'laddar') return visa('Hämtar rekpriser …');
+    if (R.status === 'fel') return visa('Rekpriserna kunde inte hämtas just nu. Ladda om sidan för att försöka igen.');
+    const pris = ((R.data && R.data.priser) || {})[valdProdukt.g14];
+    // skylten kan ha kampanjens eller ett eget namn – då står det vilken vara rekpriset gäller
+    const annan = $('#produkt').value.trim() !== valdProdukt.namn;
+    if (!(pris > 0)) return visa(annan ? `Inget rekpris för ${valdProdukt.namn}` : 'Inget rekpris för den här varan');
+    const datum = datumSv(R.data.uppdaterad);
+    visa(`${rekEtikett(lista)}${annan ? ' för ' + valdProdukt.namn : ''}: ${E.fmtKr(pris)} kr${datum ? ` (prislista ${datum})` : ''}`);
+  }
+  $('#rekprislista').addEventListener('change', () => {
+    const lista = $('#rekprislista').value;
+    ls.set('rekprislista', lista);
+    if (lista) hamtaRekpriser(lista);
+    visaRekpris();
+  });
+
   /* ---------- kampanjer ---------- */
   function renderCampaigns() {
     const list = config.kampanjer || [];
@@ -2162,11 +2401,24 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
       console.error(e); toast('Något gick fel när PDF:en skapades. Försök igen.');
     } finally { busy = false; btn.classList.remove('busy'); }
   }
+  // Kod.gs sparar högst 80 tecken i kolumnerna Skylttyp och Erbjudande (text_(…, 80) i loggaSkylt). Texterna ryms:
+  // den längsta skylttypen med en egen rubrik på 30 tecken blir 67 tecken. Bara orimligt långa belopp kortas – med …
+  // i stället för att servern klipper mitt i ett tal.
+  const LOGG_MAX = 80;
+  const ryms = s => s.length <= LOGG_MAX ? s : s.slice(0, LOGG_MAX - 1) + '…';
+  function loggErbjudande(d) {      // t.ex. 10:- vid köp av andra varor för minst 200 kr (samma text som på skylten)
+    const pris = (d.prefix ? d.prefix + ' ' : '') + (d.bigText || '') + (d.suffix || '');
+    return ryms(d.villkorText ? `${pris} ${d.villkorText}` : pris);
+  }
+  function loggSkylttyp(d) {        // t.ex. BÄTTRE PRIS! (rubrik: HELGPRIS!)
+    const namn = E.TYPES[state.typ].namn;
+    return ryms(d.rubrikEgen ? `${namn} (rubrik: ${d.rubrikText})` : namn);
+  }
   function logRow(a, hur) {
     const d = a.d;
     return {
       kampanj: activeCamp ? (activeCamp.namn || activeCamp.produkt) : '',
-      skylttyp: E.TYPES[state.typ].namn, produkt: state.produkt, erbjudande: (d.prefix ? d.prefix + ' ' : '') + (d.bigText || '') + (d.suffix || ''),
+      skylttyp: loggSkylttyp(d), produkt: state.produkt, erbjudande: loggErbjudande(d),
       jmf: d.jmfText || '', ord: d.ordText || '', lagsta: d.lagstaText || '', galler: d.extraText || '', format: state.format.join('+'), hur,
       ean: valdProdukt && $('#produkt').value === valdProdukt.namn ? valdProdukt.ean : ''
     };
@@ -2185,6 +2437,8 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
     const t = ($('input[name=typ]:checked') || {}).value;
     const cur = ($('input[name=bubbla]:checked') || {}).value;
     if (cur !== 'egen') { const v = t === 'battre' ? 'battre' : 'ingen'; const el = $(`input[name=bubbla][value="${v}"]`); if (el) el.checked = true; }
+    // texten högst upp följer med till den nya typen – om butiken inte har ändrat den (state.typ = typen före bytet)
+    if (E.TYPES[t] && arStandardRubrik($('#rubrik').value, state.typ)) $('#rubrik').value = E.TYPES[t].namn;
     render();
   });
   $('#dl').addEventListener('click', onDownload);
@@ -2206,6 +2460,7 @@ var SKYLT_ASSETS = {"logo":{"size":566.93,"paths":[{"c":"#231F20","d":"M 566.86 
   /* ---------- start ---------- */
   function start() {
     renderCampaigns();
+    visaRekprislistor();
     const kontakt = (config.installningar || {}).kontakt;
     $('#contact').textContent = kontakt ? `Frågor om kampanjer: ${kontakt}` : '';
     const draft = ls.get('utkast');
